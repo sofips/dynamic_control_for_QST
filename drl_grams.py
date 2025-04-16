@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 import configparser
+
 # plotting specifications
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -11,7 +12,8 @@ from cycler import cycler
 from tabulate import tabulate
 from scipy.linalg import expm
 import scipy.linalg as la
-
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from matplotlib.lines import Line2D
 
 mpl.rcParams.update({"font.size": 14})
 plt.rcParams["axes.axisbelow"] = True
@@ -277,7 +279,7 @@ def action_selector(actions_name, b, nh):
     elif actions_name == "extra":
         actions = one_field_actions_extra(b, nh)
     else:
-        print('Taking action matrix as input ...')
+        print("Taking action matrix as input ...")
         actions = actions_name
 
     return actions
@@ -781,6 +783,7 @@ def actions_zhang(bmax, nh):
 
     return actions
 
+
 def print_ga_params(directory):
     """
     Print the parameters of the GA algorithm from a given directory.
@@ -797,8 +800,8 @@ def print_ga_params(directory):
 
     # Load the configuration file
     config = configparser.ConfigParser()
-    config.read(f'{directory}/{files[0]}')
-   
+    config.read(f"{directory}/{files[0]}")
+
     # Convert to DataFrame
     data = []
     for section in config.sections():
@@ -810,7 +813,8 @@ def print_ga_params(directory):
     # Print in a fancy grid
     print(f"Showing parameters for {directory}:")
     print(tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
-    
+
+
 def fid_evolution(
     action_sequence, nh, dt=0.15, b=100, label="", actions="original", add_natural=False
 ):
@@ -856,14 +860,13 @@ def fid_evolution(
 
         max_natural = np.max(natural_evol)
 
+        return forced_evol, natural_evol
 
-
-        return forced_evol,natural_evol
-    
     else:
-    
+
         return forced_evol
-    
+
+
 def gen_props(actions, n, dt, test=True):
     """
     Generate propagators for a set of action matrices.
@@ -903,7 +906,9 @@ def gen_props(actions, n, dt, test=True):
         for a in np.arange(0, n_actions):
             for j in np.arange(0, n):
                 errores = (
-                    calculate_next_state(bases[a, :, j], a, props,check_normalization=True)
+                    calculate_next_state(
+                        bases[a, :, j], a, props, check_normalization=True
+                    )
                     - np.exp(-comp_i * dt * en[a, j]) * bases[a, :, j]
                 )
                 et = np.sum(errores)
@@ -914,8 +919,8 @@ def gen_props(actions, n, dt, test=True):
                     correct_propagation = False
                     quit()
 
-
     return props
+
 
 def fidelity(action_sequence, props, return_time=False, test_normalization=True):
     """
@@ -960,7 +965,8 @@ def fidelity(action_sequence, props, return_time=False, test_normalization=True)
 
     return max_fid
 
-def calculate_next_state(state, action_index, props, check_normalization = True):
+
+def calculate_next_state(state, action_index, props, check_normalization=True):
     """
     Calculate the next state by applying the propagator associated to an action.
 
@@ -988,3 +994,98 @@ def calculate_next_state(state, action_index, props, check_normalization = True)
             quit()
 
     return next_state
+
+
+def plot_ga_solutions(
+    directories, n, action_sets, labels, add_natural=False, fs=14, 
+):
+    
+    legend_elements = []
+    color_index = 0
+
+    for directory, action_set, label in zip(directories, action_sets, labels):
+        
+        ga_sequences = uniformize_data("ga", **{"directory": directory + f"n{n}/", "n": n})
+
+        config_files = [f for f in os.listdir(directory) if f.endswith(".ini")]
+        if len(config_files) != 1:
+            raise Exception("There must be exactly one .ini file in the directory.")
+
+        # Load the configuration file
+        config = configparser.ConfigParser()
+        config.read(f"{directory}/{config_files[0]}")
+
+        dt = config.getfloat("system_parameters", "dt")
+        b = config.getfloat("system_parameters", "b")
+
+        samples = np.arange(0, np.shape(ga_sequences)[0], 1)
+
+        colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+        color_index += 1
+
+        for sample in samples:
+            forced_evol, natural_evol = fid_evolution(
+            ga_sequences[sample][:],
+            n,
+            dt=dt,
+            b=b,
+            actions=action_set,
+            add_natural=True,
+            )
+            color = colors[color_index % len(colors)]
+            plt.plot(
+                forced_evol,
+                "-o",
+                color = color,
+                alpha=0.5,
+                linewidth=0.9,
+                markersize=0.2,
+            )
+
+        legend_elements = legend_elements + [Line2D([0], [0], color=color, lw=1.2, label=label)]
+
+    if add_natural:
+        plt.plot(
+            natural_evol,
+            "-o",
+            label="Natural",
+            color="slategrey",
+            linewidth=5,
+            markersize=0.2,
+            zorder=-2,
+        )
+        legend_elements.append(
+            Line2D([0], [0], color="slategrey", lw=3, label="Natural")
+        )
+    plt.xlabel('Pulse Number', fontsize=fs)
+    plt.ylabel('Transition probability', fontsize=fs)
+    plt.tight_layout()
+    plt.legend(handles=legend_elements, fontsize=fs, loc='lower left', bbox_to_anchor=(0, 0.1))
+
+
+def plot_mean_max(directories, labels, column):
+
+    index = 0
+    colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+    for directory in directories:
+        file_path = os.path.join(directory, 'nvsmaxfid.dat')
+
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"The file 'nvsmaxfid.dat' does not exist in the directory {directory}.")
+
+        results_data = pd.read_csv(file_path)
+        fs = 14
+
+        grouped_df = results_data.groupby('n')
+        mean = grouped_df[column].mean()
+        std = grouped_df[column].std()
+        min_value = grouped_df[column].min()
+        max_value = grouped_df[column].max()
+        
+        dimensions = results_data["n"].unique()
+        color = colors[index % len(colors)]
+
+        plt.errorbar(dimensions, mean, yerr=std, fmt='o--', label='mean' + labels[index], color=color, capsize=5)
+        plt.plot(dimensions, max_value, 's-', color=color,  label= 'max' + labels[index],linewidth=0.5)       
+        plt.legend(fontsize=fs)
+        index += 1
