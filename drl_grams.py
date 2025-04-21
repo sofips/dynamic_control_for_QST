@@ -782,38 +782,7 @@ def actions_zhang(bmax, nh):
             actions[i, k, k] = b[k]
 
     return actions
-
-
-def print_ga_params(directory):
-    """
-    Print the parameters of the GA algorithm from a given directory.
-
-    Parameters:
-    - directory (str): The directory containing the GA parameters file.
-
-    Returns:
-    - None
-    """
-    files = [f for f in os.listdir(directory) if f.endswith(".ini")]
-    if len(files) != 1:
-        raise Exception("There must be exactly one .ini file in the directory.")
-
-    # Load the configuration file
-    config = configparser.ConfigParser()
-    config.read(f"{directory}/{files[0]}")
-
-    # Convert to DataFrame
-    data = []
-    for section in config.sections():
-        for key, value in config.items(section):
-            data.append({"Section": section, "Parameter": key, "Value": value})
-
-    df = pd.DataFrame(data)
-
-    # Print in a fancy grid
-    print(f"Showing parameters for {directory}:")
-    print(tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
-
+ 
 
 def fid_evolution(
     action_sequence, nh, dt=0.15, b=100, label="", actions="original", add_natural=False
@@ -1063,12 +1032,34 @@ def plot_ga_solutions(
     plt.legend(handles=legend_elements, fontsize=fs, loc='lower left', bbox_to_anchor=(0, 0.1))
 
 
-def plot_mean_max(directories, labels, column):
+def plot_metric(directories, column, personalized_colors=False):
 
     index = 0
     colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
-    for directory in directories:
-        file_path = os.path.join(directory, 'nvsmaxfid.dat')
+
+    if personalized_colors:
+        colors = personalized_colors
+
+    different_parameters = get_different_parameters(directories, print_params=False)
+    
+
+
+    legend_elements = []
+    directories = different_parameters.loc["directory"].values.tolist()
+    print(directories)
+
+    labels = [
+        ", ".join(
+            f"{param}: {value}" 
+            for param, value in zip(different_parameters.index, different_parameters[col]) 
+            if param != "directory"
+        )
+        for col in different_parameters.columns
+    ]
+
+    for directory,label in zip(directories,labels):
+        
+        file_path = os.path.join(f'genetic_algorithm_results/{directory}/', 'nvsmaxfid.dat')
 
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"The file 'nvsmaxfid.dat' does not exist in the directory {directory}.")
@@ -1085,7 +1076,116 @@ def plot_mean_max(directories, labels, column):
         dimensions = results_data["n"].unique()
         color = colors[index % len(colors)]
 
-        plt.errorbar(dimensions, mean, yerr=std, fmt='o--', label='mean' + labels[index], color=color, capsize=5)
-        plt.plot(dimensions, max_value, 's-', color=color,  label= 'max' + labels[index],linewidth=0.5)       
-        plt.legend(fontsize=fs)
+        # Plot mean with error bars
+        plt.errorbar(dimensions, mean, yerr=std, fmt='o--', color=color, capsize=5)
+        # Plot max values
+        plt.plot(dimensions, max_value, 's-', color=color, linewidth=0.5)
+
+        # Add legend entry for this directory
+        legend_elements.append(
+            Line2D([0], [0], color=color, linestyle='-', label=f"{label}")
+        )
+
         index += 1
+
+    # Add legend to the plot
+
+        # Add legend entry for this directory
+    legend_elements.append(
+        Line2D([0], [0], color='grey', marker='o', linestyle='--', label=f"Mean {column}")
+    )
+    legend_elements.append(
+        Line2D([0], [0], color='grey', marker='s', linestyle='-', label=f"Max {column}")
+    )
+
+    plt.legend(handles=legend_elements, fontsize=fs)
+    index += 1
+
+
+def access_ga_params(directory, print_params=True):
+
+    """
+    Access and retrieve the GA parameters from a configuration file in the specified directory.
+
+    Parameters:
+    - directory (str): The directory containing the GA parameters file.
+    - print_params (bool): If True, prints the parameters in a fancy grid format.
+    Returns:
+    - pd.DataFrame: A DataFrame containing the parameters with columns 'Section', 'Parameter', and 'Value'.
+
+    Raises:
+    - Exception: If there is not exactly one .ini file in the directory.
+    """
+
+    files = [f for f in os.listdir(directory) if f.endswith(".ini")]
+    if len(files) != 1:
+        raise Exception("There must be exactly one .ini file in the directory.")
+
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read(f"{directory}/{files[0]}")
+
+    # Convert to DataFrame
+    data = []
+    for section in config.sections():
+        for key, value in config.items(section):
+            data.append({"Section": section, "Parameter": key, "Value": value})
+    
+    df = pd.DataFrame(data)
+    
+    if print_params == True:
+        # Print in a fancy grid
+        print(f"Showing parameters for {directory}:")
+        print(tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False))
+
+    return df
+
+def get_parameter_value(df, parameter, print_value = False):
+    row = df[(df["Parameter"] == parameter)]
+    if not row.empty:
+        value = row["Value"].values[0]
+        if print_value:
+            print(f"Parameter '{parameter}' :  {value}")
+    else:
+        raise ValueError(f"Parameter '{parameter}' not found.")
+    
+    return value
+
+def get_different_parameters(directories, print_params=True):
+    """
+    Access and retrieve the GA parameters from configuration files in the specified directories,
+    and compare across all parameters to identify those with different values, excluding 'speed_fraction' and 'directory'.
+
+    Parameters:
+    - directories (list): The directories containing the GA parameters files.
+    - print_params (bool): If True, prints the parameters in a fancy grid format.
+
+    Returns:
+    - pd.DataFrame: A DataFrame showing parameters with different values across directories.
+    """
+
+    all_dfs = []
+    for directory in directories:
+        df = access_ga_params(directory, print_params=False)
+        df["Directory"] = directory  # Add directory column for tracking
+        all_dfs.append(df)
+
+    # Concatenate all DataFrames
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+
+    # Exclude 'speed_fraction' and 'directory' parameters
+    combined_df = combined_df[~combined_df["Parameter"].isin(["speed_fraction"])]
+
+    # Pivot the DataFrame to compare values across directories
+    pivot_df = combined_df.pivot_table(
+        index="Parameter", columns="Directory", values="Value", aggfunc="first"
+    )
+
+    # Identify parameters with different values
+    different_values_df = pivot_df[pivot_df.nunique(axis=1) > 1]
+
+    if print_params:
+        print("\nParameters with Different Values:")
+        print(tabulate(different_values_df, headers="keys", tablefmt="fancy_grid"))
+
+    return different_values_df
