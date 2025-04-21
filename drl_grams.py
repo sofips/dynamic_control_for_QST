@@ -782,7 +782,7 @@ def actions_zhang(bmax, nh):
             actions[i, k, k] = b[k]
 
     return actions
- 
+
 
 def fid_evolution(
     action_sequence, nh, dt=0.15, b=100, label="", actions="original", add_natural=False
@@ -794,15 +794,13 @@ def fid_evolution(
     # generar propagadores
     actions = action_selector(actions, b, nh)
     propagators = gen_props(actions, nh, dt)
-    times = np.arange(0, t_steps, 1)
 
-    # definicion del estado inicial e inicializacion de estados forzado y natural
-
+    # inicializacion de estados
     initial_state = np.zeros(nh, dtype=np.complex_)
     initial_state[0] = 1.0
 
-    # inicializacion de estado forzado
     forced_state = initial_state
+    free_state = initial_state
 
     # almacenar evolucion natural y evolucion forzada
     forced_evol = [state_fidelity(forced_state)]
@@ -811,11 +809,6 @@ def fid_evolution(
 
         forced_state = calculate_next_state(forced_state, action, propagators)
         forced_evol.append(state_fidelity(forced_state))
-
-    max_forced = np.max(forced_evol)
-    max_time = np.argmax(forced_evol)
-
-    free_state = initial_state
 
     if add_natural:
         natural_evol = [state_fidelity(free_state)]
@@ -826,8 +819,6 @@ def fid_evolution(
 
             free_state = calculate_next_state(free_state, 0, propagators)
             natural_evol.append(state_fidelity(free_state))
-
-        max_natural = np.max(natural_evol)
 
         return forced_evol, natural_evol
 
@@ -870,8 +861,6 @@ def gen_props(actions, n, dt, test=True):
         for j in range(0, n_actions):  # diagonalization of action matrices
             en[j, :], bases[j, :, :] = la.eig(actions[j, :, :])
 
-        correct_propagation = True
-
         for a in np.arange(0, n_actions):
             for j in np.arange(0, n):
                 errores = (
@@ -882,28 +871,35 @@ def gen_props(actions, n, dt, test=True):
                 )
                 et = np.sum(errores)
                 if la.norm(et) > 1e-8:
-                    print(
-                        "Propagation Error: Eigenstates are not being properly propagated"
+                    raise ValueError(
+                        (
+                            "Propagation Error: Eigenstates are not being "
+                            "properly propagated"
+                        )
                     )
-                    correct_propagation = False
-                    quit()
 
     return props
 
 
 def fidelity(action_sequence, props, return_time=False, test_normalization=True):
     """
-    Calculate the fidelity resulting of a given pulse sequence. The state is initialized to /10...0>
+    Calculate the fidelity resulting of a given pulse sequence. The state is
+    initialized to /10...0>
 
     Parameters:
-    action_sequence (list or array-like): A sequence of actions to be applied to the initial state.
-    props (ndarray): A 3D array where props[action] is the propagation matrix corresponding to that action.
-    return_time (bool, optional): If True, return the time step at which the maximum fidelity is achieved. Default is False.
-    test_normalization (bool, optional): If True, test the normalization of the final state. Default is True.
+    action_sequence (list or array-like): A sequence of actions to be applied
+    to the initial state.
+    props (ndarray): A 3D array where props[action] is the propagation matrix
+    corresponding to that action.
+    return_time (bool, optional): If True, return the time step at which the
+    maximum fidelity is achieved. Default is False.
+    test_normalization (bool, optional): If True, test the normalization of
+    the final state. Default is True.
 
     Returns:
     float: The maximum fidelity achieved.
-    tuple: If return_time is True, returns a tuple (max_fid, imax) where max_fid is the maximum fidelity and imax is the time step at which it is achieved.
+    tuple: If return_time is True, returns a tuple (max_fid, imax) where
+    max_fid is the maximum fidelity and imax is the time step at which it is achieved.
     """
 
     n = np.shape(props)[1]
@@ -966,15 +962,35 @@ def calculate_next_state(state, action_index, props, check_normalization=True):
 
 
 def plot_ga_solutions(
-    directories, n, action_sets, labels, add_natural=False, fs=14, 
+    directories,
+    n,
+    labels,
+    add_natural=False,
+    fs=14,
 ):
     
+    different_parameters = get_different_parameters(directories, print_params=False)
+    directories = different_parameters.loc["directory"].values.tolist()
+
+    labels = [
+        ", ".join(
+            f"{param}: {value}"
+            for param, value in zip(
+                different_parameters.index, different_parameters[col]
+            )
+            if param != "directory"
+        )
+        for col in different_parameters.columns
+    ]
+
     legend_elements = []
     color_index = 0
 
-    for directory, action_set, label in zip(directories, action_sets, labels):
-        
-        ga_sequences = uniformize_data("ga", **{"directory": directory + f"n{n}/", "n": n})
+    for directory, label in zip(directories, labels):
+
+        ga_sequences = uniformize_data(
+            "ga", **{"directory": f"genetic_algorithm_results/{directory}/n{n}/", "n": n}
+        )
 
         config_files = [f for f in os.listdir(directory) if f.endswith(".ini")]
         if len(config_files) != 1:
@@ -986,7 +1002,8 @@ def plot_ga_solutions(
 
         dt = config.getfloat("system_parameters", "dt")
         b = config.getfloat("system_parameters", "b")
-
+        action_set = config.get("ga_initialization", "action_set")
+        
         samples = np.arange(0, np.shape(ga_sequences)[0], 1)
 
         colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -994,24 +1011,26 @@ def plot_ga_solutions(
 
         for sample in samples:
             forced_evol, natural_evol = fid_evolution(
-            ga_sequences[sample][:],
-            n,
-            dt=dt,
-            b=b,
-            actions=action_set,
-            add_natural=True,
+                ga_sequences[sample][:],
+                n,
+                dt=dt,
+                b=b,
+                actions=action_set,
+                add_natural=True,
             )
             color = colors[color_index % len(colors)]
             plt.plot(
                 forced_evol,
                 "-o",
-                color = color,
+                color=color,
                 alpha=0.5,
                 linewidth=0.9,
                 markersize=0.2,
             )
 
-        legend_elements = legend_elements + [Line2D([0], [0], color=color, lw=1.2, label=label)]
+        legend_elements = legend_elements + [
+            Line2D([0], [0], color=color, lw=1.2, label=label)
+        ]
 
     if add_natural:
         plt.plot(
@@ -1026,10 +1045,12 @@ def plot_ga_solutions(
         legend_elements.append(
             Line2D([0], [0], color="slategrey", lw=3, label="Natural")
         )
-    plt.xlabel('Pulse Number', fontsize=fs)
-    plt.ylabel('Transition probability', fontsize=fs)
+    plt.xlabel("Time Step", fontsize=fs)
+    plt.ylabel("Transition probability", fontsize=fs)
     plt.tight_layout()
-    plt.legend(handles=legend_elements, fontsize=fs, loc='lower left', bbox_to_anchor=(0, 0.1))
+    plt.legend(
+        handles=legend_elements, fontsize=fs, loc="lower left", bbox_to_anchor=(0, 0.1)
+    )
 
 
 def plot_metric(directories, column, personalized_colors=False):
@@ -1041,8 +1062,6 @@ def plot_metric(directories, column, personalized_colors=False):
         colors = personalized_colors
 
     different_parameters = get_different_parameters(directories, print_params=False)
-    
-
 
     legend_elements = []
     directories = different_parameters.loc["directory"].values.tolist()
@@ -1050,60 +1069,72 @@ def plot_metric(directories, column, personalized_colors=False):
 
     labels = [
         ", ".join(
-            f"{param}: {value}" 
-            for param, value in zip(different_parameters.index, different_parameters[col]) 
+            f"{param}: {value}"
+            for param, value in zip(
+                different_parameters.index, different_parameters[col]
+            )
             if param != "directory"
         )
         for col in different_parameters.columns
     ]
 
-    for directory,label in zip(directories,labels):
-        
-        file_path = os.path.join(f'genetic_algorithm_results/{directory}/', 'nvsmaxfid.dat')
+    for directory, label in zip(directories, labels):
+
+        file_path = os.path.join(
+            f"genetic_algorithm_results/{directory}/", "nvsmaxfid.dat"
+        )
 
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"The file 'nvsmaxfid.dat' does not exist in the directory {directory}.")
+            raise FileNotFoundError(
+                f"The file 'nvsmaxfid.dat' does not exist in the directory {directory}."
+            )
 
         results_data = pd.read_csv(file_path)
         fs = 14
 
-        grouped_df = results_data.groupby('n')
+        grouped_df = results_data.groupby("n")
         mean = grouped_df[column].mean()
         std = grouped_df[column].std()
         min_value = grouped_df[column].min()
         max_value = grouped_df[column].max()
-        
+
         dimensions = results_data["n"].unique()
         color = colors[index % len(colors)]
 
         # Plot mean with error bars
-        plt.errorbar(dimensions, mean, yerr=std, fmt='o--', color=color, capsize=5)
+        plt.errorbar(dimensions, mean, yerr=std, fmt="o--", color=color, capsize=5)
         # Plot max values
-        plt.plot(dimensions, max_value, 's-', color=color, linewidth=0.5)
+        plt.plot(dimensions, max_value, "s-", color=color, linewidth=0.5)
 
         # Add legend entry for this directory
         legend_elements.append(
-            Line2D([0], [0], color=color, linestyle='-', label=f"{label}")
+            Line2D([0], [0], color=color, linestyle="-", label=f"{label}")
         )
 
         index += 1
 
     # Add legend to the plot
 
-        # Add legend entry for this directory
+    # Add legend entry for this directory
     legend_elements.append(
-        Line2D([0], [0], color='grey', marker='o', linestyle='--', label=f"Mean {column}")
+        Line2D(
+            [0], [0], color="grey", marker="o", linestyle="--", label=f"Mean {column}"
+        )
     )
     legend_elements.append(
-        Line2D([0], [0], color='grey', marker='s', linestyle='-', label=f"Max {column}")
+        Line2D([0], [0], color="grey", marker="s", linestyle="-", label=f"Max {column}")
     )
 
-    plt.legend(handles=legend_elements, fontsize=fs)
+    plt.legend(
+        handles=legend_elements,
+        fontsize=fs - 2,
+        loc="upper left",
+        bbox_to_anchor=(1.05, 1),
+    )
     index += 1
 
 
 def access_ga_params(directory, print_params=True):
-
     """
     Access and retrieve the GA parameters from a configuration file in the specified directory.
 
@@ -1130,9 +1161,9 @@ def access_ga_params(directory, print_params=True):
     for section in config.sections():
         for key, value in config.items(section):
             data.append({"Section": section, "Parameter": key, "Value": value})
-    
+
     df = pd.DataFrame(data)
-    
+
     if print_params == True:
         # Print in a fancy grid
         print(f"Showing parameters for {directory}:")
@@ -1140,7 +1171,8 @@ def access_ga_params(directory, print_params=True):
 
     return df
 
-def get_parameter_value(df, parameter, print_value = False):
+
+def get_parameter_value(df, parameter, print_value=False):
     row = df[(df["Parameter"] == parameter)]
     if not row.empty:
         value = row["Value"].values[0]
@@ -1148,12 +1180,14 @@ def get_parameter_value(df, parameter, print_value = False):
             print(f"Parameter '{parameter}' :  {value}")
     else:
         raise ValueError(f"Parameter '{parameter}' not found.")
-    
+
     return value
+
 
 def get_different_parameters(directories, print_params=True):
     """
-    Access and retrieve the GA parameters from configuration files in the specified directories,
+    Access and retrieve the GA parameters from configuration files in the
+    specified directories,
     and compare across all parameters to identify those with different values, excluding 'speed_fraction' and 'directory'.
 
     Parameters:
