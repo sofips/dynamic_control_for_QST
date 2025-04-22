@@ -26,7 +26,6 @@ color_names = [
     "black",
     "magenta",
     "y",
-    "slategray",
     "darkorange",
 ]
 mpl.rcParams["axes.prop_cycle"] = cycler(color=color_names)
@@ -273,6 +272,8 @@ def calc_localization(state):
 def action_selector(actions_name, b, nh):
 
     if actions_name == "original":
+        actions = actions_zhang(b, nh)
+    elif actions_name == "zhang":
         actions = actions_zhang(b, nh)
     elif actions_name == "oaps":
         actions = one_field_actions(b, nh)
@@ -964,11 +965,10 @@ def calculate_next_state(state, action_index, props, check_normalization=True):
 def plot_ga_solutions(
     directories,
     n,
-    labels,
     add_natural=False,
     fs=14,
 ):
-    
+
     different_parameters = get_different_parameters(directories, print_params=False)
     directories = different_parameters.loc["directory"].values.tolist()
 
@@ -987,9 +987,9 @@ def plot_ga_solutions(
     color_index = 0
 
     for directory, label in zip(directories, labels):
-
+        directory = f"genetic_algorithm_results/{directory}"
         ga_sequences = uniformize_data(
-            "ga", **{"directory": f"genetic_algorithm_results/{directory}/n{n}/", "n": n}
+            "ga", **{"directory": f"{directory}/n{n}/", "n": n}
         )
 
         config_files = [f for f in os.listdir(directory) if f.endswith(".ini")]
@@ -1003,7 +1003,7 @@ def plot_ga_solutions(
         dt = config.getfloat("system_parameters", "dt")
         b = config.getfloat("system_parameters", "b")
         action_set = config.get("ga_initialization", "action_set")
-        
+
         samples = np.arange(0, np.shape(ga_sequences)[0], 1)
 
         colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -1207,6 +1207,11 @@ def get_different_parameters(directories, print_params=True):
     # Concatenate all DataFrames
     combined_df = pd.concat(all_dfs, ignore_index=True)
 
+    # Replace specific parameter names
+    combined_df["Parameter"] = combined_df["Parameter"].replace(
+        {"fitness_function": "fitness", "action_set": "actions"}
+    )
+
     # Exclude 'speed_fraction' and 'directory' parameters
     combined_df = combined_df[~combined_df["Parameter"].isin(["speed_fraction"])]
 
@@ -1223,3 +1228,111 @@ def get_different_parameters(directories, print_params=True):
         print(tabulate(different_values_df, headers="keys", tablefmt="fancy_grid"))
 
     return different_values_df
+
+
+def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1):
+
+    lines = [
+        "--",
+        "-o",
+        "-v",
+        "-s",
+        "-*",
+        "-^",
+        "-<",
+        "->",
+        "-|",
+        "-.",
+
+    ]
+
+    different_parameters = get_different_parameters(directories, print_params=False)
+    directories = different_parameters.loc["directory"].values.tolist()
+
+    labels = [
+        ", ".join(
+            f"{param}: {value}"
+            for param, value in zip(
+                different_parameters.index, different_parameters[col]
+            )
+            if param != "directory"
+        )
+        for col in different_parameters.columns
+    ]
+
+    legend_elements = []
+    color_index = 0
+
+    for directory, label in zip(directories, labels):
+        directory = f"genetic_algorithm_results/{directory}"
+        ga_sequences = uniformize_data(
+            "ga", **{"directory": f"{directory}/n{n}/", "n": n}
+        )
+
+        config_files = [f for f in os.listdir(directory) if f.endswith(".ini")]
+        if len(config_files) != 1:
+            raise Exception("There must be exactly one .ini file in the directory.")
+
+        # Load the configuration file
+        config = configparser.ConfigParser()
+        config.read(f"{directory}/{config_files[0]}")
+        dt = config.getfloat("system_parameters", "dt")
+        b = config.getfloat("system_parameters", "b")
+        action_set = config.get("ga_initialization", "action_set")
+
+        for sample in np.arange(0, nsamples, 1):
+
+            max_fid, max_index = find_max(
+                ga_sequences, n, b=b, dt=dt, actions=action_set
+            )
+
+            colors = color_names  # mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+            color_index += 1
+
+            forced_evol, natural_evol = fid_evolution(
+                ga_sequences[max_index][:],
+                n,
+                dt=dt,
+                b=b,
+                actions=action_set,
+                add_natural=True,
+            )
+            color = colors[color_index % len(colors)]
+            plt.plot(
+                forced_evol,
+                lines[color_index],
+                color=color,
+                alpha=2 / nsamples,
+                linewidth=10 / nsamples/len(directories),
+            )
+
+            legend_elements = legend_elements + [
+                Line2D(
+                    [0],
+                    [0],
+                    linestyle=lines[color_index][0],
+                    marker=lines[color_index][1],
+                    color=color,
+                    lw=1.2,
+                    label=label + f". Max. fid = {max_fid:.4f}",
+                )
+            ]
+
+            ga_sequences = np.delete(ga_sequences, max_index, axis=0)
+    if add_natural:
+        plt.plot(
+            natural_evol,
+            "--",
+            label="Natural",
+            color="slategrey",
+            linewidth=5,
+            zorder=-2,
+            alpha = 0.77
+        )
+        legend_elements.append(
+            Line2D([0], [0], color="slategrey", lw=3, label="Natural")
+        )
+    plt.xlabel("Time Step", fontsize=fs)
+    plt.ylabel("Transition probability", fontsize=fs)
+    plt.tight_layout()
+    plt.legend(handles=legend_elements, fontsize=fs - 3, loc="upper left")
