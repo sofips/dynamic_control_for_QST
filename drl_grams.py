@@ -42,14 +42,16 @@ def uniformize_data(used_algorithm, **kwargs):
         n = kwargs.get("n", None)
 
         files = os.listdir(directory)
-        ga_actions = np.empty([0, n * 5])
         number_of_sequences = 0
-
+        print(files)
         for file in files:
             if "act_sequence" in file:
-                actions = np.genfromtxt(directory + file, dtype=int)
-                ga_actions = np.vstack([ga_actions, actions])
-
+                if number_of_sequences == 0:
+                    ga_actions = np.genfromtxt(directory + file, dtype=int)
+                else:
+                    actions = np.genfromtxt(directory + file, dtype=int)
+                    ga_actions = np.vstack([ga_actions, actions])
+                number_of_sequences += 1
         return ga_actions
 
     if used_algorithm == "zhang":
@@ -1248,7 +1250,7 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
 
     different_parameters = get_different_parameters(directories, print_params=False)
     directories = different_parameters.loc["directory"].values.tolist()
-
+    
     labels = [
         ", ".join(
             f"{param}: {value}"
@@ -1302,7 +1304,7 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
                 forced_evol,
                 lines[color_index],
                 color=color,
-                alpha=2 / nsamples,
+                alpha=np.min((2 / nsamples,1)),
                 linewidth=10 / nsamples/len(directories),
             )
 
@@ -1334,5 +1336,5 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
         )
     plt.xlabel("Time Step", fontsize=fs)
     plt.ylabel("Transition probability", fontsize=fs)
+    plt.legend(handles=legend_elements, bbox_to_anchor=(0.05, 0.05), loc="center left")
     plt.tight_layout()
-    plt.legend(handles=legend_elements, fontsize=fs - 3, loc="upper left")
