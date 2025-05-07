@@ -1203,7 +1203,7 @@ def get_different_parameters(directories, print_params=True):
     all_dfs = []
     for directory in directories:
         df = access_ga_params(directory, print_params=False)
-        df["Directory"] = directory  # Add directory column for tracking
+        df["directory"] = directory  # Add directory column for tracking
         all_dfs.append(df)
 
     # Concatenate all DataFrames
@@ -1219,7 +1219,7 @@ def get_different_parameters(directories, print_params=True):
 
     # Pivot the DataFrame to compare values across directories
     pivot_df = combined_df.pivot_table(
-        index="Parameter", columns="Directory", values="Value", aggfunc="first"
+        index="Parameter", columns="directory", values="Value", aggfunc="first"
     )
 
     # Identify parameters with different values
@@ -1249,7 +1249,10 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
     ]
 
     different_parameters = get_different_parameters(directories, print_params=False)
-    directories = different_parameters.loc["directory"].values.tolist()
+    
+    if "directory" in different_parameters.index:
+        directories = different_parameters.loc["directory"].values.tolist()
+    
     
     labels = [
         ", ".join(
@@ -1336,5 +1339,102 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
         )
     plt.xlabel("Time Step", fontsize=fs)
     plt.ylabel("Transition probability", fontsize=fs)
-    plt.legend(handles=legend_elements, bbox_to_anchor=(0.05, 0.05), loc="center left")
+    plt.legend(handles=legend_elements, loc="center left")
     plt.tight_layout()
+
+def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsamples=1):
+
+    lines = [
+            "--",
+            "-o",
+            "-v",
+            "-s",
+            "-*",
+            "-^",
+            "-<",
+            "->",
+            "-|",
+            "-.",
+
+        ]     
+    
+    for trial in trials:
+        plt.figure(figsize=(15,6))
+
+        legend_elements = []
+        trial_directory = f"{directory}/trial_{trial}/"
+        
+        color_index = 0
+
+        ga_sequences = uniformize_data(
+            "ga", **{"directory": trial_directory, "n": n}
+        )
+
+        config_files = [f for f in os.listdir(trial_directory) if f.endswith(".ini")]
+        if len(config_files) != 1:
+            raise Exception("There must be exactly one .ini file in the directory.")
+
+        # Load the configuration file
+        config = configparser.ConfigParser()
+        config.read(f"{trial_directory}/{config_files[0]}")
+        dt = config.getfloat("system_parameters", "dt")
+        b = config.getfloat("system_parameters", "b")
+        action_set = config.get("ga_initialization", "action_set")
+        plt.title(f"Trial {trial}, n = {n:.2f}, b = {b:.2f}, dt = {dt:.2f}")
+        for sample in np.arange(0, nsamples, 1):
+
+            max_fid, max_index = find_max(
+                ga_sequences, n, b=b, dt=dt, actions=action_set
+            )
+
+            colors = color_names  # mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+            color_index += 1
+
+            forced_evol, natural_evol = fid_evolution(
+                ga_sequences[max_index][:],
+                n,
+                dt=dt,
+                b=b,
+                actions=action_set,
+                add_natural=True,
+            )
+            color = colors[color_index % len(colors)]
+            times = np.arange(0, len(forced_evol), 1)*dt
+            plt.plot(times,
+                forced_evol,
+                lines[color_index],
+                color=color,
+                alpha=np.min((2 / nsamples,1)),
+                linewidth=10 / nsamples,
+            )
+
+            legend_elements = legend_elements + [
+                Line2D(
+                    [0],
+                    [0],
+                    linestyle=lines[color_index][0],
+                    marker=lines[color_index][1],
+                    color=color,
+                    lw=1.2,
+                    label= f". Max. fid = {max_fid:.4f}",
+                )
+            ]
+
+            ga_sequences = np.delete(ga_sequences, max_index, axis=0)
+        if add_natural:
+            plt.plot(times,
+                natural_evol,
+                "--",
+                label="Natural",
+                color="slategrey",
+                linewidth=5,
+                zorder=-2,
+                alpha = 0.77
+            )
+            legend_elements.append(
+                Line2D([0], [0], color="slategrey", lw=3, label="Natural")
+            )
+        plt.xlabel("Time Step", fontsize=fs)
+        plt.ylabel("Transition probability", fontsize=fs)
+        plt.legend(handles=legend_elements, loc="center left")
+        plt.tight_layout()
