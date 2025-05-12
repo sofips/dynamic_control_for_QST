@@ -1,0 +1,2 @@
+n,sample_index,max_fidelity,ttime,cpu_time,generations,trial_index,max_fitness,dt,b
+32,0,0.9951689263456321,21.83827149,194.27083254,143,95.0,0.58782005,0.12550730741029392,32.9380995613928
