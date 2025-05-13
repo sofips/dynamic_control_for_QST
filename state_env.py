@@ -219,8 +219,13 @@ class State(object):
     
     def random_reset(self):
         
-        psi = np.random.rand(chain_length) + 1j * np.random.rand(chain_length)  # random complex numbers
-        psi = psi / np.linalg.norm(psi)  # normalize the state
+        psi = [0 for i in range(chain_length)]  # initial state is [1;0;0;0;0...]
+        psi[0] = 1
+        
+        psi = psi + 0.01* np.random.normal(0, 1, len(psi))
+        
+        psi = psi / np.linalg.norm(psi)
+        # normalize the state
         self.state = np.array([str(i) for i in psi])
         self.state = np.array(list(itertools.chain(*[(i.real, i.imag) for i in psi])))
         self.stp = 0
@@ -283,7 +288,7 @@ class State(object):
         statelist = np.transpose(np.mat(statess))  # to 'matrix'
         next_state = prop * statelist  # do operation
 
-        next_state = next_state + 0.03 * np.random.normal(0, 1, next_state.shape)
+        next_state = next_state + 0.01* np.random.normal(0, 1, next_state.shape)
         next_state = next_state / np.linalg.norm(next_state)
 
         reward = reward_function(next_state, prop, self.stp)
