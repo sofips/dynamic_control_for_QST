@@ -216,6 +216,17 @@ class State(object):
         self.maxfid = 0
 
         return self.state
+    
+    def random_reset(self):
+        
+        psi = np.random.rand(chain_length) + 1j * np.random.rand(chain_length)  # random complex numbers
+        psi = psi / np.linalg.norm(psi)  # normalize the state
+        self.state = np.array([str(i) for i in psi])
+        self.state = np.array(list(itertools.chain(*[(i.real, i.imag) for i in psi])))
+        self.stp = 0
+        self.maxfid = 0
+        
+        return self.state
 
     def step(self, actionnum):
 
@@ -254,5 +265,44 @@ class State(object):
         self.state = next_states  # this vector is input to the network
         return next_states, reward, doned, fidelity
 
+    def noisy_step(self, actionnum):
+
+        self.stp += 1
+
+        actions = self.action_space[actionnum]  # magnetic field configuration
+
+        ham = actions
+        
+        prop = expm(-1j * ham * DT)  # evolution operator
+
+        statess = [
+            complex(self.state[2 * i], self.state[2 * i + 1]) 
+            for i in range(chain_length)
+        ]  # transfer real vector to complex vector
+
+        statelist = np.transpose(np.mat(statess))  # to 'matrix'
+        next_state = prop * statelist  # do operation
+
+        next_state = next_state + 0.03 * np.random.normal(0, 1, next_state.shape)
+        next_state = next_state / np.linalg.norm(next_state)
+
+        reward = reward_function(next_state, prop, self.stp)
+        fidelity = state_fidelity(next_state)
+        doned = False
+        
+        if fidelity > self.maxfid:
+            self.maxfid = state_fidelity(next_state)
+        if fidelity > 0.95:
+            doned = True
+
+        next_states = [next_state[i, 0]
+                       for i in range(chain_length)]  # 'matrix' to list
+        next_states = np.array(
+            list(itertools.chain(*[(i.real, i.imag) for i in next_states]))
+        )  # complex to real vector
+
+        self.state = next_states  # this vector is input to the network
+        return next_states, reward, doned, fidelity
 
 
+    
