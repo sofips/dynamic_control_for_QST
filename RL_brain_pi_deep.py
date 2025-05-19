@@ -180,9 +180,10 @@ class DQNPrioritizedReplay:
         self.fc1_dims = fc1_dims
         self.epsilon = 0 if e_greedy_increment is not None else self.epsilon_max
         self.prioritized = prioritized  # decide to use double q or not
-
+        self.max_reward = 0.
         self.learn_step_counter = 0
-
+        self.n_top_memories = 5
+        
         self._build_net()
         t_params = tf.get_collection("target_net_params")
         e_params = tf.get_collection("eval_net_params")
@@ -191,8 +192,8 @@ class DQNPrioritizedReplay:
         if self.prioritized:
             self.memory = Memory(capacity=memory_size)
         else:
-            self.memory = np.zeros((self.memory_size, n_features * 2 + 2))
-
+            self.memory = np.zeros((self.memory_size, self.n_features * 2 + 2))  
+            self.top_memory = np.zeros((self.n_top_memories, self.n_features * 2 + 2))      
         if sess is None:
             self.sess = tf.Session()
             self.sess.run(tf.global_variables_initializer())
@@ -318,6 +319,12 @@ class DQNPrioritizedReplay:
             index = self.memory_counter % self.memory_size
             self.memory[index, :] = transition
             self.memory_counter += 1
+            
+            lowest_top_reward = min(self.top_memory[:, self.n_features + 1])
+            
+            if r > lowest_top_reward:
+                index = np.argmin(self.top_memory[:, self.n_features + 1])
+                self.top_memory[index, :] = transition
 
     def choose_action(self, observation):
         observation = observation[np.newaxis, :]
@@ -336,8 +343,9 @@ class DQNPrioritizedReplay:
         if self.prioritized:
             tree_idx, batch_memory, ISWeights = self.memory.sample(self.batch_size)
         else:
-            sample_index = np.random.choice(self.memory_size, size=self.batch_size)
-            batch_memory = self.memory[sample_index, :]
+            sample_index = np.random.choice(self.memory_size, size=self.batch_size-self.n_top_memories)
+            
+            batch_memory = np.vstack((self.memory[sample_index, :],self.top_memory))
 
         q_next, q_eval = self.sess.run(
             [self.q_next, self.q_eval],

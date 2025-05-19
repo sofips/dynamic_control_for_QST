@@ -79,12 +79,13 @@ def full_reward_zero(next_state, prop, time_step):
 
     return reward
 
+
 def original_reward(next_state, prop, time_step):
     
     fidelity = state_fidelity(next_state)
     
     if fidelity < 0.8:
-        reward = fidelity*10
+        reward = fidelity*10 # +1/diferencia entre localizacion y N 
     if fidelity >= 0.8 and fidelity <= 0.95:
         reward = 100/(1+np.exp(10*(0.95-fidelity)))
     if fidelity > 0.95:
@@ -95,6 +96,22 @@ def original_reward(next_state, prop, time_step):
         ############# a discount is given with respected to step
     return reward
 
+def site_evolution_reward(next_state, prop, time_step):
+    
+    mean_site = np.sum(np.asarray([np.real(next_state[j] * np.conjugate(next_state[j])) * (j + 1) for j in range(0, chain_length - 1)]))
+    fidelity = state_fidelity(next_state)
+    
+    if fidelity < 0.8:
+        reward = fidelity*10  + (1/abs(mean_site - chain_length)**2)
+        
+    elif fidelity >= 0.8 and fidelity <= 0.95:
+        reward = 100/(1+np.exp(10*(0.95-fidelity))) + (1/abs(mean_site - chain_length)**2)
+    elif fidelity > 0.95:
+        reward = 2500 + (1/abs(mean_site - chain_length)**2)
+    
+    reward = reward*(0.95**time_step)
+    return reward
+    
 def ipr_reward(next_state, prop, time_step):
     
     ipr = calc_ipr(next_state)
@@ -148,6 +165,7 @@ if action_set == "zhang":
                 + np.diag(actions)
             )
         action_hamiltonians[mag.index(actions)] = ham
+    propagators = [expm(-1j * action_hamiltonians[i] * DT) for i in range(action_hamiltonians.shape[0])]
 
 elif action_set == "oaps":
 
@@ -182,6 +200,8 @@ elif action_set == "oaps":
         return action_matrices
 
     action_hamiltonians = one_field_actions(field_strength,chain_length, coupling)
+    propagators = [expm(-1j * action_hamiltonians[i] * DT) for i in range(action_hamiltonians.shape[0])]
+
 
 if reward_function == "full reward":
     reward_function = full_reward
@@ -192,6 +212,8 @@ elif reward_function == "ipr":
 elif reward_function == "full reward zero":
     reward_function = full_reward_zero
     prop0 = expm(-1j * action_hamiltonians[0] * DT)
+elif reward_function == "site evolution":
+    reward_function = site_evolution_reward
 
 class State(object):
     def __init__(self):
@@ -199,7 +221,7 @@ class State(object):
         self.action_space = action_hamiltonians
         print(self.action_space)
         self.n_actions = config.getint("system_parameters","n_actions")  # allowed action number =16
-        self.n_features = config.getint("learning_parameters","number_of_features")  # the dimension of input vector
+        self.n_features = config.getint("learning_parameters","number_of_features") + 1  # the dimension of input vector
         self.stp = 0  # initially at the first step
         self.stmax = config.getint(
             "system_parameters", "max_t_steps"
@@ -214,24 +236,8 @@ class State(object):
         self.state = np.array(list(itertools.chain(*[(i.real, i.imag) for i in psi])))
         self.stp = 0
         self.maxfid = 0
-
-        return self.state
-    
-    def random_reset(self):
-        
-        psi = [0 for i in range(chain_length)]  # initial state is [1;0;0;0;0...]
-        psi[0] = 1
-        
-        psi = psi + 0.01* np.random.normal(0, 1, len(psi))
-        
-        psi = psi / np.linalg.norm(psi)
-        # normalize the state
-        self.state = np.array([str(i) for i in psi])
-        self.state = np.array(list(itertools.chain(*[(i.real, i.imag) for i in psi])))
-        self.stp = 0
-        self.maxfid = 0
-        
-        return self.state
+        self.tstate = np.append(self.state, self.stp)
+        return self.tstate  # the input of network is a real vector, so we need to transfer complex vector to real vector
 
     def step(self, actionnum):
 
@@ -243,6 +249,8 @@ class State(object):
         
         prop = expm(-1j * ham * DT)  # evolution operator
 
+        #prop = propagators[actionnum]
+        
         statess = [
             complex(self.state[2 * i], self.state[2 * i + 1]) 
             for i in range(chain_length)
@@ -268,17 +276,20 @@ class State(object):
         )  # complex to real vector
 
         self.state = next_states  # this vector is input to the network
-        return next_states, reward, doned, fidelity
-
+        self.tstate =np.append(self.state, self.stp)
+        
+        return self.tstate, reward, doned, fidelity
+   
     def noisy_step(self, actionnum):
-
+        
+        noise_amplitude = 0.2
         self.stp += 1
 
-        actions = self.action_space[actionnum]  # magnetic field configuration
-
-        ham = actions
+        # actions = self.action_space[actionnum]  # magnetic field configuration
+        # ham = actions
+        # prop = expm(-1j * ham * DT)  # evolution operator
         
-        prop = expm(-1j * ham * DT)  # evolution operator
+        prop = propagators[actionnum]
 
         statess = [
             complex(self.state[2 * i], self.state[2 * i + 1]) 
@@ -287,10 +298,8 @@ class State(object):
 
         statelist = np.transpose(np.mat(statess))  # to 'matrix'
         next_state = prop * statelist  # do operation
-
-        next_state = next_state + 0.01* np.random.normal(0, 1, next_state.shape)
-        next_state = next_state / np.linalg.norm(next_state)
-
+    
+    
         reward = reward_function(next_state, prop, self.stp)
         fidelity = state_fidelity(next_state)
         doned = False
@@ -299,6 +308,14 @@ class State(object):
             self.maxfid = state_fidelity(next_state)
         if fidelity > 0.95:
             doned = True
+            
+        random_phases = np.random.uniform(-1,1, size=chain_length)*DT*noise_amplitude
+        next_state = next_state * np.exp(1j*random_phases)
+        
+        norm = np.linalg.norm(next_state)
+        if 1 - norm > 1e-10:
+            raise ValueError("State is not normalized after noise addition")
+        
 
         next_states = [next_state[i, 0]
                        for i in range(chain_length)]  # 'matrix' to list
@@ -307,7 +324,9 @@ class State(object):
         )  # complex to real vector
 
         self.state = next_states  # this vector is input to the network
-        return next_states, reward, doned, fidelity
-
-
+        self.tstate =np.append(self.state, self.stp)
+        
+        return self.tstate, reward, doned, fidelity 
+    
+    
     
