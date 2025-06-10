@@ -96,24 +96,53 @@ def original_reward(next_state, prop, time_step):
         ############# a discount is given with respected to step
     return reward
 
+# def site_evolution_reward(next_state, prop, time_step):
+    
+#     mean_site = np.sum(np.asarray([np.real(next_state[j] * np.conjugate(next_state[j])) * (j + 1) for j in range(0, chain_length - 1)]))
+#     fidelity = state_fidelity(next_state)
+    
+#     if fidelity < 0.8:
+#         reward = fidelity*10  +  (chain_length/abs(mean_site - chain_length))
+#         reward = reward*(0.95**time_step)
+        
+#         print("a) fidelity", fidelity, "mean_site", mean_site, "reward", reward)
+        
+#     elif fidelity >= 0.8 and fidelity <= 0.9:
+#         reward = 10000/(1+np.exp(10*(0.95-fidelity))) + (chain_length/abs(mean_site - chain_length)**2)
+#         reward = reward*(0.95**time_step)
+        
+#         print("b) fidelity", fidelity, "mean_site", mean_site, "reward", reward)
+#     elif fidelity > 0.90:
+#         reward = 3500*fidelity + (chain_length/abs(mean_site - chain_length)**2)
+#         reward = reward*(0.95**time_step)
+
+#         print("c) fidelity", fidelity, "mean_site", mean_site, "reward", reward)
+        
+#     return reward
+
 def site_evolution_reward(next_state, prop, time_step):
     
     mean_site = np.sum(np.asarray([np.real(next_state[j] * np.conjugate(next_state[j])) * (j + 1) for j in range(0, chain_length - 1)]))
     fidelity = state_fidelity(next_state)
-    
-    if fidelity < 0.8:
-        reward = fidelity*10  + (1/abs(mean_site - chain_length)**2)
-        
-    elif fidelity >= 0.8 and fidelity <= 0.95:
-        reward = 100/(1+np.exp(10*(0.95-fidelity))) + (1/abs(mean_site - chain_length)**2)
-    elif fidelity > 0.95:
-        reward = 2500 + (1/abs(mean_site - chain_length)**2)
+
+    if time_step < chain_length:
+        reward = 100*mean_site
+
+    elif time_step < 3*chain_length:
+        reward = 100*(mean_site/(time_step*DT))**2  #/abs(mean_site - chain_length)
+
+    else:
+        if fidelity > 0.95:
+            reward = 10000*fidelity
+        else:
+            reward = 1000*(mean_site/chain_length)*fidelity**2
     
     reward = reward*(0.95**time_step)
-    return reward
-    
+           
+    return reward 
+
 def ipr_reward(next_state, prop, time_step):
-    
+
     ipr = calc_ipr(next_state)
     fidelity = state_fidelity(next_state)
     reward = fidelity/ipr
@@ -219,9 +248,8 @@ class State(object):
     def __init__(self):
         super(State, self)
         self.action_space = action_hamiltonians
-        print(self.action_space)
         self.n_actions = config.getint("system_parameters","n_actions")  # allowed action number =16
-        self.n_features = config.getint("learning_parameters","number_of_features") + 1  # the dimension of input vector
+        self.n_features = config.getint("learning_parameters","number_of_features")  # the dimension of input vector
         self.stp = 0  # initially at the first step
         self.stmax = config.getint(
             "system_parameters", "max_t_steps"
@@ -236,8 +264,8 @@ class State(object):
         self.state = np.array(list(itertools.chain(*[(i.real, i.imag) for i in psi])))
         self.stp = 0
         self.maxfid = 0
-        self.tstate = np.append(self.state, self.stp)
-        return self.tstate  # the input of network is a real vector, so we need to transfer complex vector to real vector
+        #self.tstate = np.append(self.state, self.stp)
+        return self.state  # the input of network is a real vector, so we need to transfer complex vector to real vector
 
     def step(self, actionnum):
 
@@ -276,14 +304,16 @@ class State(object):
         )  # complex to real vector
 
         self.state = next_states  # this vector is input to the network
-        self.tstate =np.append(self.state, self.stp)
+        #self.tstate =np.append(self.state, self.stp)
         
-        return self.tstate, reward, doned, fidelity
+        return self.state, reward, doned, fidelity
    
-    def noisy_step(self, actionnum):
+    def noisy_step(self, actionnum, noise_amplitude=0.75, noise_probability=0.1):
         
-        noise_amplitude = 0.2
         self.stp += 1
+
+        if np.random.rand() < noise_probability:
+            noise_amplitude = 0
 
         # actions = self.action_space[actionnum]  # magnetic field configuration
         # ham = actions
@@ -324,9 +354,9 @@ class State(object):
         )  # complex to real vector
 
         self.state = next_states  # this vector is input to the network
-        self.tstate =np.append(self.state, self.stp)
+        #self.tstate =np.append(self.state, self.stp)
         
-        return self.tstate, reward, doned, fidelity 
+        return self.state, reward, doned, fidelity 
     
     
     
