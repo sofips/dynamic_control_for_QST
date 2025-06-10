@@ -1508,7 +1508,6 @@ def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsampl
         plt.title(f"Trial {trial}, n = {n:.2f}, b = {b:.2f}, dt = {dt:.2f}")
 
         nsequences = ga_sequences.shape[0] if len(ga_sequences.shape) > 1 else 1
-        print(nsequences)
 
         nsamples = min(nsamples, nsequences) # in case trials have been pruned
 
