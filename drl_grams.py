@@ -43,7 +43,7 @@ def uniformize_data(used_algorithm, **kwargs):
 
         files = os.listdir(directory)
         number_of_sequences = 0
-        print(files)
+
         for file in files:
             if "act_sequence" in file:
                 if number_of_sequences == 0:
@@ -660,7 +660,6 @@ def find_max(action_sequences, nh, b=100, dt=0.15, actions="original"):
         if max_forced > max_fid:
             max_fid = max_forced
             max_index = i
-    print("Max fid:", max_fid, "Max Index:", max_index)
     return max_fid, max_index
 
 
@@ -1067,7 +1066,6 @@ def plot_metric(directories, column, personalized_colors=False):
 
     legend_elements = []
     directories = different_parameters.loc["directory"].values.tolist()
-    print(directories)
 
     labels = [
         ", ".join(
@@ -1342,6 +1340,133 @@ def plot_max_fid_solutions(directories, n, add_natural=False, fs=14, nsamples=1)
     plt.legend(handles=legend_elements, loc="center left")
     plt.tight_layout()
 
+
+#--------------------------------------------------------------------
+#                  Extracting and plotting results from Optuna trials
+#--------------------------------------------------------------------
+
+def extract_ga_optuna(main_directory, scatter_plot = False, print_top5 = False):
+    
+    optuna_directories = [d for d in os.listdir(main_directory) if os.path.isdir(os.path.join(main_directory, d))]
+
+    results_data = {
+    "Mean Fidelity": [],
+    "Max Fidelity": [],
+    "Mean Time": [],
+    "dt": [],
+    "b": [],
+    "directory": [],
+    "pruned": [],   
+    }
+
+
+    for directory in optuna_directories:
+        directory_path = os.path.join(main_directory, directory)
+        
+        files = [f for f in os.listdir(directory_path) if f.endswith(".ini")]
+        
+        if len(files) != 1:
+            print(f"Skipping directory {directory_path} because it does not contain exactly one .ini file.")
+            raise Exception("There must be exactly one .ini file in the directory.")
+        
+        # Load the configuration file
+        config = configparser.ConfigParser()
+        config.read(os.path.join(directory_path, files[0]))
+        dt = config.getfloat("system_parameters", "dt")
+        b = config.getfloat("system_parameters", "b")
+        action_set = config.get("ga_initialization", "action_set")
+        
+        if "metrics_summary.csv" in os.listdir(directory_path):
+            metrics_summary = pd.read_csv(os.path.join(directory_path, "metrics_summary.csv"))
+            
+            mean_fidelity = metrics_summary.loc[metrics_summary['Unnamed: 0'] == 'mean', 'max_fidelity'].values[0]
+            max_fidelity = metrics_summary.loc[metrics_summary['Unnamed: 0'] == 'max', 'max_fidelity'].values[0]
+            mean_ttime = metrics_summary.loc[metrics_summary['Unnamed: 0'] == 'mean', 'ttime'].values[0]
+            
+            results_data["Mean Fidelity"].append(mean_fidelity)
+            results_data["Max Fidelity"].append(max_fidelity)
+            results_data["Mean Time"].append(mean_ttime)
+            results_data["dt"].append(dt)
+            results_data["b"].append(b)
+            results_data["directory"].append(directory)
+            results_data["pruned"].append(False)
+        else:
+            
+            act_sequences = [f for f in os.listdir(directory_path) if f.__contains__("sequence")]
+            if len(act_sequences) == 0:
+                print(f"Skipping directory {directory_path} because it does not contain any action sequence files.")
+                continue
+            if len(act_sequences) == 1:
+                act_sequence = os.path.join(directory_path, act_sequences[0])
+                n = config.getint("system_parameters", "n")
+                
+                act_sequence = np.genfromtxt(act_sequence, dtype=int)
+                evolution = fid_evolution(action_sequence=act_sequence, nh=n, dt=dt, b=b, actions=action_set) 
+                max_fidelity = np.max(evolution)
+                ttime = np.argmax(evolution) * dt
+                mean_fidelity = max_fidelity
+                
+                results_data["Mean Fidelity"].append(mean_fidelity)
+                results_data["Max Fidelity"].append(max_fidelity)
+                results_data["Mean Time"].append(ttime)
+                results_data["dt"].append(dt)
+                results_data["b"].append(b)
+                results_data["directory"].append(directory)
+                results_data["pruned"].append(True)
+            
+            else:
+                if len(act_sequences) > 1:
+                    act_sequence = act_sequences[0]
+                    n = config.getint("system_parameters", "n")
+                    
+                    act_sequences = uniformize_data(
+                        "ga", **{"directory": directory_path+'/', "n": n})
+                    
+                    max_fidelity,imax = find_max(action_sequences=act_sequences, nh=n, dt=dt, b=b, actions=action_set)
+                    evolution = fid_evolution(action_sequence=act_sequences[imax,:], nh=n, dt=dt, b=b, actions=action_set) 
+                    max_fidelity = np.max(evolution)
+                    ttime = np.argmax(evolution) * dt
+                    mean_fidelity = max_fidelity
+                    
+                    results_data["Mean Fidelity"].append(mean_fidelity)
+                    results_data["Max Fidelity"].append(max_fidelity)
+                    results_data["Mean Time"].append(ttime)
+                    results_data["dt"].append(dt)
+                    results_data["b"].append(b)
+                    results_data["directory"].append(directory)
+                    results_data["pruned"].append(True)
+                
+                    
+                        
+    results_df = pd.DataFrame(results_data)
+
+    if scatter_plot:
+        plt.figure(figsize=(15, 5))
+        scatter = plt.scatter(
+            results_df["dt"], 
+            results_df["b"], 
+            c=results_df["Max Fidelity"], 
+            cmap="viridis",
+            s=100  # Marker size
+        )
+        plt.xlabel("dt")
+        plt.ylabel("b")
+        plt.colorbar(scatter, label="Max Fidelity")
+        plt.title("Max Fidelity (N=32)")
+
+        # Annotate the best 5 points
+        top_5 = results_df.nlargest(5, "Max Fidelity")
+        for _, row in top_5.iterrows():
+            plt.annotate(
+                f"{row['Max Fidelity']:.3f}", 
+                (row["dt"], row["b"]), 
+                textcoords="offset points", 
+                xytext=(5, 5), 
+                ha="center"
+            )
+
+    return results_df.sort_values(by='Max Fidelity', ascending=False).reset_index(drop=True)
+
 def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsamples=1):
 
     lines = [
@@ -1359,7 +1484,7 @@ def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsampl
         ]     
     
     for trial in trials:
-        plt.figure(figsize=(15,6))
+        plt.figure(figsize=(12,6))
 
         legend_elements = []
         trial_directory = f"{directory}/trial_{trial}/"
@@ -1381,46 +1506,86 @@ def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsampl
         b = config.getfloat("system_parameters", "b")
         action_set = config.get("ga_initialization", "action_set")
         plt.title(f"Trial {trial}, n = {n:.2f}, b = {b:.2f}, dt = {dt:.2f}")
+
+        nsequences = ga_sequences.shape[0] if len(ga_sequences.shape) > 1 else 1
+        print(nsequences)
+
+        nsamples = min(nsamples, nsequences) # in case trials have been pruned
+
         for sample in np.arange(0, nsamples, 1):
 
-            max_fid, max_index = find_max(
+            if nsequences > 1:
+                max_fid, max_index = find_max(
                 ga_sequences, n, b=b, dt=dt, actions=action_set
-            )
-
-            colors = color_names  # mpl.rcParams["axes.prop_cycle"].by_key()["color"]
-            color_index += 1
-
-            forced_evol, natural_evol = fid_evolution(
-                ga_sequences[max_index][:],
-                n,
-                dt=dt,
-                b=b,
-                actions=action_set,
-                add_natural=True,
-            )
-            color = colors[color_index % len(colors)]
-            times = np.arange(0, len(forced_evol), 1)*dt
-            plt.plot(times,
-                forced_evol,
-                lines[color_index],
-                color=color,
-                alpha=np.min((2 / nsamples,1)),
-                linewidth=10 / nsamples,
-            )
-
-            legend_elements = legend_elements + [
-                Line2D(
-                    [0],
-                    [0],
-                    linestyle=lines[color_index][0],
-                    marker=lines[color_index][1],
-                    color=color,
-                    lw=1.2,
-                    label= f". Max. fid = {max_fid:.4f}",
                 )
-            ]
 
-            ga_sequences = np.delete(ga_sequences, max_index, axis=0)
+                colors = color_names  # mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+                color_index += 1
+                forced_evol, natural_evol = fid_evolution(
+                    ga_sequences[max_index][:],
+                    n,
+                    dt=dt,
+                    b=b,
+                    actions=action_set,
+                    add_natural=True,
+                )
+                ga_sequences = np.delete(ga_sequences, max_index, axis=0)
+                color = colors[color_index % len(colors)]
+                times = np.arange(0, len(forced_evol), 1)*dt
+                plt.plot(times,
+                    forced_evol,
+                    lines[color_index],
+                    color=color,
+                    alpha=np.min((2 / nsamples,1)),
+                    linewidth=10 / nsamples,
+                )
+
+                legend_elements = legend_elements + [
+                    Line2D(
+                        [0],
+                        [0],
+                        linestyle=lines[color_index][0],
+                        marker=lines[color_index][1],
+                        color=color,
+                        lw=1.2,
+                        label= f"Max. fid = {max_fid:.4f}",
+                    )
+                ]
+
+            else:
+                forced_evol, natural_evol = fid_evolution(
+                    ga_sequences,
+                    n,
+                    dt=dt,
+                    b=b,
+                    actions=action_set,
+                    add_natural=True,
+                )
+                max_fid = np.max(forced_evol)
+
+                times = np.arange(0, len(forced_evol), 1)*dt
+
+                plt.plot(times,
+                    forced_evol,
+                    '-o',
+                    color='red',
+                    alpha=np.min((2 / nsamples,1)),
+                    linewidth=1.2,
+                )
+                legend_elements = legend_elements + [
+                    Line2D(
+                        [0],
+                        [0],
+                        linestyle=lines[0][0],
+                        marker='o',                  
+                        color='red',
+                        lw=0.5,
+                        alpha=0.5,
+                        label= f"Max. fid = {max_fid:.4f}",
+                    )
+                ]
+            
+
         if add_natural:
             plt.plot(times,
                 natural_evol,
