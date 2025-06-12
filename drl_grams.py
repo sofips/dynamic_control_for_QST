@@ -2,6 +2,8 @@ import numpy as np
 import os
 import pandas as pd
 import configparser
+import tensorflow as tf
+from state_env import State  # module with environment and dynamics
 
 # plotting specifications
 import matplotlib as mpl
@@ -14,6 +16,11 @@ from scipy.linalg import expm
 import scipy.linalg as la
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.lines import Line2D
+import seaborn as sns
+
+from scipy import stats
+
+import matplotlib.pyplot as plt
 
 mpl.rcParams.update({"font.size": 14})
 plt.rcParams["axes.axisbelow"] = True
@@ -1602,3 +1609,279 @@ def plot_optuna_ga_trials(directory,n,trials=[1], add_natural=False,fs=14,nsampl
         plt.ylabel("Transition probability", fontsize=fs)
         plt.legend(handles=legend_elements, loc="center left")
         plt.tight_layout()
+
+
+#---------------------------------------------------------------------------------
+#                                       RL
+#---------------------------------------------------------------------------------
+
+def optuna_summary(summary_file, return_df=False):
+
+    """
+    Reads an Optuna summary file and prints the best trials and their parameters.
+
+    Parameters:
+    - summary_file (str): Path to the Optuna summary file.
+    Returns:
+    - summary_df (pd.DataFrame): DataFrame containing the summary of trials.
+    """
+
+    summary_df = pd.read_csv(summary_file)
+    summary_df.sort_values(by='binned_max_fid', ascending=False)
+
+    # Display the top 3 configurations based on binned_max_fid
+    top_configs = summary_df.sort_values(by='binned_max_fid', ascending=False).head(3)
+    print("Top 3 configurations based on binned_max_fid:")
+    print(top_configs[['Name', 'binned_max_fid', 'fc1_dims', 'learning_rate', 'epsilon_increment']])
+    
+    if return_df:
+        return summary_df
+
+def access_model(trial_directory, final=True):
+
+    """
+    Access and retrieve the model from a trial directory.
+
+    Parameters:
+    - trial_directory (str): The directory containing the trial results.
+    - final (bool): If True, retrieves the final model. If False, retrieves the initial model.
+
+    Returns:
+    - model: The loaded model.
+    """
+
+    for file in os.listdir(trial_directory):
+
+        if file.endswith(".ini"):
+            config_file = file
+            break
+        
+        config = configparser.ConfigParser()
+        # Read the config file
+        config.read(trial_directory + "/" + config_file)
+
+        # Copy the config file to the current directory
+        current_directory = os.getcwd()
+        os.system(f"cp {trial_directory}/{config_file} {current_directory}")
+
+        if final:
+            checkpoint_prefix = trial_directory +'/final_model/model.ckpt'
+        else:
+            checkpoint_prefix = trial_directory +'/best_model/model.ckpt'
+
+        # Load the model from the checkpoint
+        with tf.compat.v1.Session() as sess:
+            # Restore the graph structure from the .meta file
+            saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
+            
+            # Restore the weights from the checkpoint
+            saver.restore(sess, checkpoint_prefix)
+            
+            
+            # The model is now loaded into the session
+            print("Model restored successfully!")
+    
+            return sess
+
+
+def model_noise_summary(trial_directory, final=True):
+    """
+    Prints the summary of the model from a trial directory.
+
+    Parameters:
+    - trial_directory (str): The directory containing the trial results.
+    - final (bool): If True, retrieves the final model. If False, retrieves the initial model.
+    """
+    for file in os.listdir(trial_directory):
+        if file.endswith(".ini"):
+            config_file = file
+            break
+
+    config = configparser.ConfigParser()
+    # Read the config file
+    config.read(trial_directory + "/" + config_file)
+
+    # Copy the config file to the current directory
+    current_directory = os.getcwd()
+    os.system(f"cp {trial_directory}/{config_file} {current_directory}")
+
+    if final:
+        checkpoint_prefix = trial_directory +'/final_model/model.ckpt'
+    else:
+        checkpoint_prefix = trial_directory +'/best_model/model.ckpt'
+
+    with tf.compat.v1.Session() as sess:
+        # Restore the graph structure from the .meta file
+        saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
+        
+        # Restore the weights from the checkpoint
+        saver.restore(sess, checkpoint_prefix)
+        
+        
+        # The model is now loaded into the session
+        print("Model restored successfully!")
+    
+
+
+    input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name("s:0")
+    output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name("eval_net/l2/add:0")
+    
+    n = config.getint("system_parameters", "chain_length")  # number of qubits
+
+    env = State()  # environment
+
+    noise_effects = pd.DataFrame(columns=['noise_amplitude', 'noise_probability', 'mean_fidelity'])    # we store the mean fidelity for each noise amplitude and probability
+    noise_details = pd.DataFrame(columns=['noise_amplitude', 'noise_probability', 'action_sequence', 'max_fidelity', 'sequence'])
+    number_of_episodes = 100
+
+    with tf.compat.v1.Session() as sess:
+        
+        saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
+
+        # Restore the graph structure and weights again
+        saver.restore(sess, checkpoint_prefix)
+        for noise_amplitude in np.linspace(0, 1, 11):
+            for noise_probability in np.linspace(0, 1, 11):
+                print(f"Testing with noise_amplitude: {noise_amplitude}, noise_probability: {noise_probability}")
+            
+
+
+                lth = config.getint("system_parameters", "max_t_steps")
+                
+                best_action_sequences = [[] for i in range(0, 10)]
+                best_fidelities = np.zeros(10)
+
+                actionspace = []  # store successful actions
+                Qvalue = []  # total reward
+                fid_max_vector = []  # max. fidelity in each episode
+                t_fid_max_vector = []  # time of max. fidelity
+                fid_end_vector = []  # final fidelity
+                t_end_vector = []  # time of final fidelity
+                success_action_sequences = []  # store successful success_action_seq
+
+                for episode in range(number_of_episodes):
+                    # Generate a complex normalized vector of 16 components
+                    observation = env.reset()
+                    
+                    newaction = []
+                    Q = 0
+                    fid_max = 0
+                    t_fid_max = 0
+
+                    for i in range(lth):  # episode maximum length
+                        # Use the loaded model to predict the action
+                        # Correct the shape of the observation before feeding it to the model
+                        predicted_action = sess.run(output_tensor, feed_dict={input_tensor: np.expand_dims(observation, axis=0)})
+                        predicted_action = np.argmax(predicted_action)
+                        newaction.append(predicted_action)
+
+                        observation_, reward, done, fidelity = env.noisy_step(predicted_action,noise_amplitude=noise_amplitude,noise_probability=noise_probability)  # take action in the environment
+
+                        Q += reward  # total reward
+                    
+
+                        # Save max. fidelity value
+                        if fidelity > fid_max:
+                            fid_max = fidelity
+                            t_fid_max = i
+
+                        if done:  # fidelity(reward) larger than threshold
+                            newaction += [0 for xx in range(lth - len(newaction))]
+                            actionspace.append(newaction)
+                            Qvalue.append(Q)
+                            fid_max_vector.append(fid_max)
+                            fid_end_vector.append(fidelity)
+                            t_fid_max_vector.append(t_fid_max)
+                            t_end_vector.append(i + 1)
+
+                            if fid_max > 0.9:
+                                success_action_sequences.append(newaction)
+
+                                break
+
+                        observation = observation_  # Update current state
+
+                    if i == lth - 1:
+                        actionspace.append(newaction)
+                        fid_max_vector.append(fid_max)
+                        fid_end_vector.append(fidelity)
+                        t_fid_max_vector.append(t_fid_max)
+                        t_end_vector.append(i + 1)
+                        Qvalue.append(Q)
+
+                        if fid_max > 0.9:
+                            success_action_sequences.append(newaction)
+
+                    if fid_max > min(best_fidelities):
+                        idx = np.argmin(best_fidelities)
+                        best_fidelities[idx] = fid_max
+                        best_action_sequences[idx] = newaction
+
+                    episodes = np.arange(0, number_of_episodes)
+
+                    noise_details = pd.concat(
+                        [
+                            noise_details,
+                            pd.DataFrame(
+                                {
+                                    "noise_amplitude": noise_amplitude,
+                                    "noise_probability": noise_probability,
+                                    "max_fidelity": fid_max,
+                                },
+                                index=[0],
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+
+
+                noise_effects = pd.concat(
+                        [
+                            noise_effects,
+                            pd.DataFrame(
+                                {
+                                    "noise_amplitude": noise_amplitude,
+                                    "noise_probability": noise_probability,
+                                    "mean_fidelity": np.mean(fid_max_vector),
+                                },
+                                index=[0],
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+
+    pivot_data = noise_effects.pivot(
+        index='noise_amplitude',
+        columns='noise_probability',
+        values='mean_fidelity'
+    )
+
+    X, Y = np.meshgrid(pivot_data.columns.values, pivot_data.index.values)
+    Z = pivot_data.values
+
+    plt.figure(figsize=(8, 6))
+    contour = plt.contourf(X, Y, Z, levels=25, cmap='coolwarm')
+    plt.colorbar(contour, label='Mean Fidelity')
+    plt.xlabel('Noise Probability')
+    plt.ylabel('Noise Amplitude')
+    plt.title('Mean Fidelity Contour Plot')
+    plt.show()
+
+    plt.figure(figsize=(8, 5))
+    sns.histplot(noise_details['max_fidelity'], bins=50, edgecolor='black')
+
+    # Calculate statistics
+    median = noise_details['max_fidelity'].median()
+    mean = noise_details['max_fidelity'].mean()
+    mode = noise_details['max_fidelity'].mode().iloc[0]
+
+    # Plot vertical lines
+    plt.axvline(median, color='orange', linestyle='--', label=f'Median: {median:.3f}')
+    plt.axvline(mean, color='red', linestyle='-', label=f'Mean: {mean:.3f}')
+    plt.axvline(mode, color='green', linestyle='-.', label=f'Mode: {mode:.3f}')
+
+    plt.xlabel('Max Fidelity')
+    plt.ylabel('Count')
+    plt.title('Distribution of Max Fidelity')
+    plt.legend()
+    plt.show()
