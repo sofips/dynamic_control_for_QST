@@ -3,8 +3,8 @@ import os
 import pandas as pd
 import configparser
 import tensorflow as tf
-from state_env import State  # module with environment and dynamics
-
+#from state_env import State  # module with environment and dynamics
+import importlib
 # plotting specifications
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -1651,37 +1651,40 @@ def access_model(trial_directory, final=True):
     """
 
     for file in os.listdir(trial_directory):
-
+        print(f"Looking for config file in {trial_directory}")
+        print(f"Found file: {file}")
         if file.endswith(".ini"):
             config_file = file
+            print(f"Config file found: {config_file}")
             break
+
         
-        config = configparser.ConfigParser()
-        # Read the config file
-        config.read(trial_directory + "/" + config_file)
+    config = configparser.ConfigParser()
+    # Read the config file
+    config.read(trial_directory + "/" + config_file)
 
-        # Copy the config file to the current directory
-        current_directory = os.getcwd()
-        os.system(f"cp {trial_directory}/{config_file} {current_directory}")
+    # Copy the config file to the current directory
+    current_directory = os.getcwd()
+    #os.system(f"cp {trial_directory}/{config_file} {current_directory}")
 
-        if final:
-            checkpoint_prefix = trial_directory +'/final_model/model.ckpt'
-        else:
-            checkpoint_prefix = trial_directory +'/best_model/model.ckpt'
+    if final:
+        checkpoint_prefix = trial_directory +'/final_model/model.ckpt'
+    else:
+        checkpoint_prefix = trial_directory +'/best_model/model.ckpt'
 
-        # Load the model from the checkpoint
-        with tf.compat.v1.Session() as sess:
-            # Restore the graph structure from the .meta file
-            saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
-            
-            # Restore the weights from the checkpoint
-            saver.restore(sess, checkpoint_prefix)
-            
-            
-            # The model is now loaded into the session
-            print("Model restored successfully!")
-    
-            return sess
+    # Load the model from the checkpoint
+    with tf.compat.v1.Session() as sess:
+        # Restore the graph structure from the .meta file
+        saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
+        
+        # Restore the weights from the checkpoint
+        saver.restore(sess, checkpoint_prefix)
+        
+        
+        # The model is now loaded into the session
+        print("Model restored successfully!")
+
+        return sess
 
 
 def model_noise_summary(trial_directory, final=True):
@@ -1704,6 +1707,7 @@ def model_noise_summary(trial_directory, final=True):
     # Copy the config file to the current directory
     current_directory = os.getcwd()
     os.system(f"cp {trial_directory}/{config_file} {current_directory}")
+    
 
     if final:
         checkpoint_prefix = trial_directory +'/final_model/model.ckpt'
@@ -1725,15 +1729,16 @@ def model_noise_summary(trial_directory, final=True):
 
     input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name("s:0")
     output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name("eval_net/l2/add:0")
-    
     n = config.getint("system_parameters", "chain_length")  # number of qubits
-
+    
+    State = importlib.reload(importlib.import_module("state_env")).State
     env = State()  # environment
 
     noise_effects = pd.DataFrame(columns=['noise_amplitude', 'noise_probability', 'mean_fidelity'])    # we store the mean fidelity for each noise amplitude and probability
     noise_details = pd.DataFrame(columns=['noise_amplitude', 'noise_probability', 'action_sequence', 'max_fidelity', 'sequence'])
-    number_of_episodes = 100
-
+    number_of_episodes = 2
+    access_model(trial_directory, final=final)  # load the model
+    
     with tf.compat.v1.Session() as sess:
         
         saver = tf.compat.v1.train.import_meta_graph(checkpoint_prefix + ".meta")
