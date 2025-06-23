@@ -1,4 +1,3 @@
-
 from state_env import State
 import pandas as pd
 import numpy as np
@@ -6,16 +5,18 @@ import configparser
 import matplotlib.pyplot as plt
 import sys
 
-chain_length = sys.argv[1]
+chain_length = int(sys.argv[1])
 
 noisy_env = State()  # noisy environment
 ideal_env = State()  # ideal environment
 
-number_of_episodes = 100
+number_of_episodes = 2
 
 noise_effects = pd.DataFrame(columns=['episode','noise_amplitude', 'noise_probability', 'max_fidelity'])    # we store the mean fidelity for each noise amplitude and probability
 noise_details = pd.DataFrame(columns=['episode','time_step','noise_amplitude', 'noise_probability', 'fid_value','inner_product'])
 
+config = configparser.ConfigParser()
+config.read("config.ini")  # read the configuration file
 
 for noise_amplitude in np.linspace(0, 1, 21):
     for noise_probability in np.linspace(0, 1, 21):
