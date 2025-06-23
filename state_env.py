@@ -338,10 +338,14 @@ class State(object):
             self.maxfid = state_fidelity(next_state)
         if fidelity > 0.95:
             doned = True
-            
-        random_phases = np.random.uniform(-1,1, size=chain_length)*DT*noise_amplitude
-        next_state = next_state * np.exp(1j*random_phases)
         
+        random_phases = np.random.uniform(-1,1, size=chain_length)*DT*noise_amplitude
+        #next_state = next_state * np.exp(1j*random_phases)
+        
+
+        for i in range(chain_length):
+            next_state[i] = next_state[i] * np.exp(1j*random_phases[i])
+
         norm = np.linalg.norm(next_state)
         if 1 - norm > 1e-10:
             raise ValueError("State is not normalized after noise addition")
@@ -355,7 +359,8 @@ class State(object):
 
         self.state = next_states  # this vector is input to the network
         #self.tstate =np.append(self.state, self.stp)
-        
+
+        fidelity = state_fidelity(next_state)
         return self.state, reward, doned, fidelity 
     
     
