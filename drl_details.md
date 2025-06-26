@@ -1,8 +1,12 @@
 # Detalles de implementación para el algoritmos de DRL 
 
-### Híper-parametros
+<table>
+<tr><th> Parámetros de aprendizaje </th><th> Parámetros del sistema</th></tr>
+<tr><td>
 
-| Híper-parámetros                        | Valor    |
+
+
+| Parámetro                        | Valor    |
 |:----------------------------------------|:---------|
 | Tamaño del minibatch                    | 32       |
 | Tamaño de la memoria                    | 40000    |
@@ -13,18 +17,20 @@
 | Epsilon inicial/final ($\epsilon$)      | 1/0.01   |
 | Decaimiento                             | 0.0001   |
 | Frecuencia de aprendizaje               | 5        |
-| Tolerancia (1-F) ($\zeta$)              | 0.05     |
 
-### Parámetros del sistema físico
+</td><td>
 
-| Híper-parámetros                        | Valor    |
+
+| Parámetros                            | Valor    |
 |:----------------------------------------|:---------|
 | Largo de cadena (N)                     | variable |
 | Paso temporal ($dt$)                    | 0.15     |
-| Tiempo máximo ($\tau$)                  | $5N \ dt$|
+| Tiempo máximo ($\tau$)                  | $5N \times dt$|
 | Int. de acoplamientos ($J$)             | 1        |
 | Campo externo ($B$)                     | 100      |
+| Tolerancia (1-F) ($\zeta$)              | 0.05     |
 
+</td></tr> </table>
 
 ### Función recompensa utilizada
 
@@ -35,5 +41,4 @@ r(t) =
     \dfrac{100}{1 + \exp(10(1-\zeta-F(t)))}, & \text{si } 0.8 \leq F_N(t) \leq 1 - \zeta \\\\
     2500, & \text{si } F_N(t) > 1 - \zeta
 \end{cases}
-\tag{1} \label{rec_instantanea}
 $$
