@@ -32,3 +32,19 @@
 </td>
 </tr>
 </table>
+
+## Función fitness
+
+$$
+f_2 = \sum_{i=0}^{i(t_{\text{max}})} r(t) \cdot \gamma^i
+$$
+
+donde
+
+$$
+r(t) = \begin{cases}
+10 P(t), & P(t) \leq 0.8 \\\\
+\frac{100}{1 + \exp(10(1 - \zeta - P(t)))}, & 0.8 < P(t) \leq 1 - \zeta \\\\
+2500, & P(t) > 1 - \zeta
+\end{cases}
+$$
