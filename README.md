@@ -1,12 +1,11 @@
-# dynamic_control_for_QST
-# Quantum State Transfer using Dynamic Control
+# Optimización de la Transmisión de Estados Cuánticos en Cadenas de Qubits usando Deep Reinforcement Learning y Algoritmos Genéticos.
 
-This repository contains **preliminary results** and **visualization tools** for our current work on quantum state transfer using dynamic control.
+Este repositorio se incluye como material auxiliar a nuestro trabajo sobre control dinámico para transmisión de estados cuánticos en cadenas de spin usando Deep Reinforcement Learning y Algoritmos Genéticos. En particular, esta rama acompaña al artículo corto enviado a la 54JAIIO: Jornadas Argentinas de Informática e Investigación Operativa.
 
-## 📌 Overview
-- **Objective**: Study and optimize quantum state transfer through dynamic control techniques.
-- **Contents**: 
-  - Simulation data and preliminary results for different optimization methods.
-  - Tools for visualizing quantum state dynamics.
-  - Scripts for analyzing control protocols.
+
+
+
+
+
+
 
