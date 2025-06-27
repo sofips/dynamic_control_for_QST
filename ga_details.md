@@ -39,4 +39,4 @@ La función fitness utilizada se inspira en el algoritmo de DRL pero lo implemen
 
 donde
 
-<img src="zhang_reward.png" alt="alt text" width="260"/>
+<img src="zhang_reward.png" alt="alt text" width="400"/>
