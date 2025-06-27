@@ -33,16 +33,10 @@ Estos fueron los parámetros utilizados por defecto en todos los experimentos ex
 
 ## Función fitness
 
-$$
-f_2 = \sum_{i=0}^{i(t_{\text{max}})} r(t) \cdot \gamma^i
-$$
+La función fitness utilizada se inspira en el algoritmo de DRL pero lo implementa simultáneamente sobre todo el conjunto de 
+
+<img src="fitness.png" alt="alt text" width="200"/>
 
 donde
 
-$$
-r(t) = \begin{cases}
-10 P(t), & P(t) \leq 0.8 \\\\
-\frac{100}{1 + \exp(10(1 - \zeta - P(t)))}, & 0.8 < P(t) \leq 1 - \zeta \\\\
-2500, & P(t) > 1 - \zeta
-\end{cases}
-$$
+![alt text](zhang_reward.png)

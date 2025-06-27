@@ -36,5 +36,8 @@ Estos fueron los parámetros utilizados por defecto en todos los experimentos ex
 
 ### Función recompensa utilizada
 
-La función recompensa utilizada es la que se usa en el trabajo original (Zhang, 2018)
-![alt text](og_reward.png)
+La función recompensa $r_t$ utilizada fue tomada del trabajo de referencia (Zhang, 2018) y está basada en la fidelidad $F(t)$ o probabilidad de transmisión y de la tolerancia o threshold de la misma $\zeta$:
+
+ 
+
+![alt text](zhang_reward.png)
