@@ -10,7 +10,7 @@ Este repositorio resume los resultados y gráficos presentados en el artículo *
 
 ### Algoritmos genéticos vs DRL
 
-El primer gráfico presentado muestra las fidelidades máximas y medias logradas con ambos métodos para distintos largos de cadenas de qubits. Los directorios con los resultados crudos se incluyen en este repositorio en sus respectivos directorios `drl_preliminary_results` y `ga_preliminary_results` y los códigos necesarios para generarlos pueden encontrarse [aquí] (https://github.com/sofips/dynamic_control_for_QST/blob/JAIIO_material_suplementario/JAIIO_graphs.ipynb).
+El primer gráfico presentado muestra las fidelidades máximas y medias logradas con ambos métodos para distintos largos de cadenas de qubits. Los directorios con los resultados crudos se incluyen en este repositorio en sus respectivos directorios `drl_preliminary_results` y `ga_preliminary_results` y los códigos necesarios para generarlos pueden encontrarse [aquí](https://github.com/sofips/dynamic_control_for_QST/blob/JAIIO_material_suplementario/JAIIO_graphs.ipynb).
 
 ### Extracción de datos de fidelidad 
 
