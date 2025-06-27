@@ -11,7 +11,7 @@
 | Tamaño del minibatch                    | 32       |
 | Tamaño de la memoria                    | 40000    |
 | Leraning rate  ($\alpha$)               | 0.01     |
-| Discounto factor ($\gamma$)             | 0.95     |
+| Discount factor ($\gamma$)             | 0.95     |
 | $N^\circ$ de capas ocultas              | 2        |
 | Neuronas por capa oculta                | 120      |
 | Epsilon inicial/final ($\epsilon$)      | 1/0.01   |
@@ -28,7 +28,7 @@
 | Tiempo máximo ($\tau$)                  | $5N \times dt$|
 | Int. de acoplamientos ($J$)             | 1        |
 | Campo externo ($B$)                     | 100      |
-| Tolerancia (1-F) ($\zeta$)              | 0.05     |
+| Tolerancia (1-P) ($\zeta$)              | 0.05     |
 
 </td></tr> </table>
 
@@ -38,4 +38,4 @@ Estos fueron los parámetros utilizados por defecto en todos los experimentos ex
 
 La función recompensa $r_t$ utilizada fue tomada del trabajo de referencia (Zhang, 2018) y está basada en la fidelidad o probabilidad de transmisión $P(t)$ definida en la ec (6) del texto: "*Optimización de la Transmisión de Estados Cuánticos en Cadenas de Qubits usando Deep Reinforcement Learning y Algoritmos Genéticos*" y de la tolerancia o threshold de la misma $\zeta$:
 
-![alt text](zhang_reward.png)
+![alt text](zhang_reward2.png)
