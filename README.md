@@ -44,3 +44,9 @@ Es posible que los tiempos de ejecución en DRL puedan acortarse mediante optimi
 Al presentar tiempos de cómputo menores, es posible extender los resultados a mayores dimensiones. Para el siguiente gráfico, se fijó la tolerancia $\zeta$ = 0.01, para verificar si era posible mejorar aún más los resultados. Se observa que para dimensiones altas el método comienza a fallar, para eso incorporamos un nuevo conjunto de acciones que aplica control en cada sitio y permite obtener fidelidades cercanas a 0.99 para cadenas de hasta 64 qubits.
 
 <img src="figures/Fig4.png" alt="alt text" width="1200"/>
+
+### Parámetros utilizados
+
+- Los parámetros utilizados pueden encontrarse en los siguientes enlaces:
+    - [Algoritmo Genético](https://github.com/sofips/dynamic_control_for_QST/blob/JAIIO_material_suplementario/ga_details.md)
+    - [DRL](https://github.com/sofips/dynamic_control_for_QST/blob/JAIIO_material_suplementario/drl_details.md)
