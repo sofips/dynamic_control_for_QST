@@ -32,13 +32,9 @@
 
 </td></tr> </table>
 
+Estos fueron los parámetros utilizados por defecto en todos los experimentos excepto en aquellos en los que se especifique alguna variación. El programa guarda automáticamente una tarjeta de configuración con los parámetros que usó al ejecutarse que queda almacenada en el mismo directorio que los resultados. 
+
 ### Función recompensa utilizada
 
-$$
-r(t) = 
-\begin{cases}
-    10F_N(t), & \text{si } F_N(t) \leq 0.8 \\\\
-    \dfrac{100}{1 + \exp(10(1-\zeta-F(t)))}, & \text{si } 0.8 \leq F_N(t) \leq 1 - \zeta \\\\
-    2500, & \text{si } F_N(t) > 1 - \zeta
-\end{cases}
-$$
+La función recompensa utilizada es la que se usa en el trabajo original (Zhang, 2018)
+![alt text](og_reward.png)

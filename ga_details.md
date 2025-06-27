@@ -9,7 +9,7 @@
 | Parámetro                              | Valor                    |
 |----------------------------------------|---------------------------|
 | Individuos en población                | 3000                      |
-| Selección de padres                    |300 usando 'sss'          |
+| Selección de padres                    |300 (10%) usando 'sss'          |
 | Elitismo                               | 300   (10%)                   |
 | Crossover                              | Uniforme (probabilidad = 0.8)              |
 | Mutación                               | swap sobre N genes       |
@@ -27,6 +27,8 @@
 | Tolerancia (1-F) ($\zeta$)             | 0.01                  |
 
 </td></tr> </table>
+
+Estos fueron los parámetros utilizados por defecto en todos los experimentos excepto en aquellos en los que se especifique alguna variación. El programa guarda automáticamente una tarjeta de configuración con los parámetros que usó al ejecutarse que queda almacenada en el mismo directorio que los resultados. 
 
 
 ## Función fitness
