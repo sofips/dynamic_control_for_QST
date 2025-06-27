@@ -1,23 +1,10 @@
-# Detalles de implementación para el algoritmos de DRL 
+# Detalles de implementación para el algoritmo genético
 
 <table>
-<tr>
-<td style="vertical-align: top; padding-right: 40px">
+<tr><th> Parámetros de aprendizaje </th><th> Parámetros del sistema</th></tr>
+<tr><td>
 
-### Parámetros Físicos
 
-| Parámetro                              | Valor                 |
-|----------------------------------------|------------------------|
-| Paso temporal ($dt$)                   | 0.15                  |
-| Acoplamientos ($J$)                    | 1                     |
-| Campo externo ($B$)                    | 100                   |
-| Número de genes                        | 5N ($t \simeq 1.5N$)  |
-| Tolerancia (1-F) ($\zeta$)             | 0.01                  |
-
-</td>
-<td style="vertical-align: top">
-
-### Parámetros del algoritmo genético
 
 | Parámetro                              | Valor                    |
 |----------------------------------------|---------------------------|
@@ -28,10 +15,19 @@
 | Mutación                               | swap sobre N genes       |
 | Saturación                             | 20                       |
 
+</td><td>
 
-</td>
-</tr>
-</table>
+
+| Parámetro                              | Valor                 |
+|----------------------------------------|------------------------|
+| Paso temporal ($dt$)                   | 0.15                  |
+| Acoplamientos ($J$)                    | 1                     |
+| Campo externo ($B$)                    | 100                   |
+| Número de genes                        | 5N ($t \simeq 1.5N$)  |
+| Tolerancia (1-F) ($\zeta$)             | 0.01                  |
+
+</td></tr> </table>
+
 
 ## Función fitness
 
