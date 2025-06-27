@@ -6,14 +6,14 @@
 
 
 
-| Parámetro                              | Valor                    |
+| Parámetro                              | Valor                        |
 |----------------------------------------|---------------------------|
-| Individuos en población                | 3000                      |
-| Selección de padres                    |300 (10%) usando 'sss'          |
-| Elitismo                               | 300   (10%)                   |
-| Crossover                              | Uniforme (probabilidad = 0.8)              |
-| Mutación                               | swap sobre N genes       |
-| Saturación                             | 20                       |
+| Individuos en población                | 3000                         |
+| Selección de padres                    |300 (10%) usando 'sss'        |
+| Elitismo                               | 300   (10%)                  |
+| Crossover                              | Uniforme (probabilidad = 0.8)|
+| Mutación                               | swap sobre N genes           |
+| Saturación                             | 20                            |
 
 </td><td>
 
