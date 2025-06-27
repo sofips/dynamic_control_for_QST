@@ -1,4 +1,4 @@
-# Detalles de implementación para el algoritmos de DRL 
+# Detalles de implementación para el algoritmo de DRL 
 
 ### Híper-parametros
 
