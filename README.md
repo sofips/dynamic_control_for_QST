@@ -23,13 +23,13 @@ Se recuperan los 10 valores más altos de fidelidad obtenidos durante el entrena
 
 Se realizaron pruebas para distintas longitudes dentro del directorio principal, se encuentran los directorios de las distintas pruebas (con distintos parámetros de algoritmo). A su vez, dentro de cada uno de ellos se halla un archivo de resumen del que extraemos las fidelidades máximas obtenidas y los directorios con las secuencias de acciones para cada longitud de cadena.
 
-<img src="figures/Fig1.png" alt="alt text" width="200"/>
+<img src="figures/Fig1.png" alt="alt text" width="1200"/>
 
 ## Comparación de soluciones obtenidas
 
 A continuación, se muestran las probabilidades de transición asociadas a las secuencias obtenidas por cada uno de los métodos. Los resultados observados son para una cadena de 16 qubits.
 
-<img src="figures/Fig2.png" alt="alt text" width="200"/>
+<img src="figures/Fig2.png" alt="alt text" width="1200"/>
 
 ## Tiempos de CPU
 
@@ -37,10 +37,10 @@ Es interesante destacar también que el algoritmo genético presenta una gran ve
 
 Es posible que los tiempos de ejecución en DRL puedan acortarse mediante optimizaciones. Sin embargo, dada la naturaleza de implementación del algoritmo genético, este es fácilmente paralelizable en GPU lo que permite reducir ampliamente los tiempos de cómputo.
 
-<img src="figures/Fig3.png" alt="alt text" width="200"/>
+<img src="figures/Fig3.png" alt="alt text" width="1200"/>
 
 ## Extensión a más dimensiones y alta tolerancia
 
 Al presentar tiempos de cómputo menores, es posible extender los resultados a mayores dimensiones. Para el siguiente gráfico, se fijó la tolerancia $\zeta$ = 0.01, para verificar si era posible mejorar aún más los resultados. Se observa que para dimensiones altas el método comienza a fallar, para eso incorporamos un nuevo conjunto de acciones que aplica control en cada sitio y permite obtener fidelidades cercanas a 0.99 para cadenas de hasta 64 qubits.
 
-<img src="figures/Fig4.png" alt="alt text" width="200"/>
+<img src="figures/Fig4.png" alt="alt text" width="1200"/>
