@@ -792,7 +792,6 @@ def actions_zhang(bmax, nh):
 
     return actions
 
-
 def fid_evolution(
     action_sequence, nh, dt=0.15, b=100, label="", actions="original", add_natural=False
 ):
@@ -803,13 +802,15 @@ def fid_evolution(
     # generar propagadores
     actions = action_selector(actions, b, nh)
     propagators = gen_props(actions, nh, dt)
+    times = np.arange(0, t_steps, 1)
 
-    # inicializacion de estados
+    # definicion del estado inicial e inicializacion de estados forzado y natural
+
     initial_state = np.zeros(nh, dtype=np.complex_)
     initial_state[0] = 1.0
 
+    # inicializacion de estado forzado
     forced_state = initial_state
-    free_state = initial_state
 
     # almacenar evolucion natural y evolucion forzada
     forced_evol = [state_fidelity(forced_state)]
@@ -818,6 +819,11 @@ def fid_evolution(
 
         forced_state = calculate_next_state(forced_state, action, propagators)
         forced_evol.append(state_fidelity(forced_state))
+
+    max_forced = np.max(forced_evol)
+    max_time = np.argmax(forced_evol)
+
+    free_state = initial_state
 
     if add_natural:
         natural_evol = [state_fidelity(free_state)]
@@ -829,12 +835,15 @@ def fid_evolution(
             free_state = calculate_next_state(free_state, 0, propagators)
             natural_evol.append(state_fidelity(free_state))
 
-        return forced_evol, natural_evol
+        max_natural = np.max(natural_evol)
 
+
+
+        return forced_evol,natural_evol
+    
     else:
-
+    
         return forced_evol
-
 
 def gen_props(actions, n, dt, test=True):
     """
