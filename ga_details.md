@@ -33,7 +33,7 @@ Estos fueron los parámetros utilizados por defecto en todos los experimentos ex
 
 ## Función fitness
 
-La función fitness utilizada se inspira en el algoritmo de DRL pero lo implementa simultáneamente sobre todo el conjunto de 
+La función fitness utilizada se inspira en el algoritmo de DRL pero, en lugar de implementarse secuencialmente, se hace sobre la secuencia completa de acciones.   
 
 <img src="fitness.png" alt="alt text" width="200"/>
 
